@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Scanner;
@@ -23,38 +24,40 @@ public class Word {
 
 	private WordType wt;
 	private String ws;
-	private LinkedHashSet<WT> possibleTypes = new LinkedHashSet<WT>();
+	private LinkedHashSet<WordType> possibleTypes = new LinkedHashSet<WordType>();
 	
 	public Word(String string) {
 		this.setWs(string);
 		setPossibleTypes(string);
-		this.setWt(this.possibleTypes);
+		this.setWordType(this.possibleTypes);
 	}
 
 	public Word(Word w) {
 		this.setWs(w.ws);
-		for (Iterator<WT> iterator = w.possibleTypes.iterator(); iterator.hasNext();) {
-			WT wt = iterator.next();
+		for (Iterator<WordType> iterator = w.possibleTypes.iterator(); iterator.hasNext();) {
+			WordType wt = iterator.next();
 			this.possibleTypes.add(wt);
 		}
-		this.setWt(this.possibleTypes);
+		this.setWordType(this.possibleTypes);
 	}
 
 	private void setPossibleTypes(String string) {
 //		getClosedClassTypes(string);
 //		getOpenClassTypes(string);
-		possibleTypes.addAll(getWiktionaryTypes(string));
+		possibleTypes.addAll(WiktionaryParser.getTypes(string));
 		if(possibleTypes.isEmpty()){
-			possibleTypes.addAll(getWiktionaryTypes(string.toLowerCase()));
+			possibleTypes.addAll(WiktionaryParser.getTypes(string.toLowerCase()));
 		}
 		if(possibleTypes.isEmpty() & Character.isUpperCase(string.charAt(0))){ // A NAME
-			possibleTypes.add(WT.PRON);
+			possibleTypes.add(new Pron());
 		}
 	}
 	
 	
-	private LinkedHashSet<WT> getWiktionaryTypes(String string) {
-		LinkedHashSet<WT> lhs = new LinkedHashSet<WT>();
+	private Collection<? extends WordType> getWiktionaryTypes(String string) {
+		
+		
+		LinkedHashSet<WordType> lhs = new LinkedHashSet<WordType>();
         try {
 			Document doc = Jsoup.connect("http://en.wiktionary.org/wiki/"+string).get();
 		    
@@ -66,31 +69,35 @@ public class Word {
 					Element e = eng.get(0).nextElementSibling();
 					while(e!=null && e.tagName()!="h2"){
 						if(!e.getElementsMatchingOwnText("Noun").isEmpty()){
-							lhs.add(WT.NOUN);						
+							lhs.add(new Noun());						
 						}
 						if(!e.getElementsMatchingOwnText("Verb").isEmpty()){
-							lhs.add(WT.VERB);
+							lhs.add(new Verb());
+							while(e.tagName()!="ol"){
+								System.out.println(e.text());
+								e=e.nextElementSibling();
+							}
 						} 
 						if(!e.getElementsMatchingOwnText("Adjective").isEmpty()){
-							lhs.add(WT.ADJ);					 
+							lhs.add(new Adj());					 
 						} 
 						if(!e.getElementsMatchingOwnText("Adverb").isEmpty()){
-							lhs.add(WT.ADV);
+							lhs.add(new Adv());
 						} 
 						if(!e.getElementsMatchingOwnText("Determiner").isEmpty()){
-							lhs.add(WT.DET);
+							lhs.add(new Det());
 						}
 						if(!e.getElementsMatchingOwnText("Article").isEmpty()){
-							lhs.add(WT.DET);
+							lhs.add(new Det());
 						} 
 						if(!e.getElementsMatchingOwnText("Pronoun").isEmpty()){
-							lhs.add(WT.PRON);
+							lhs.add(new Pron());
 						} 
 						if(!e.getElementsMatchingOwnText("Preposition").isEmpty()){
-							lhs.add(WT.PREP);
+							lhs.add(new Prep());
 						} 
 						if(!e.getElementsMatchingOwnText("Conjunction").isEmpty()){
-							lhs.add(WT.CONJ);
+							lhs.add(new Conj());
 						}
 						e=e.nextElementSibling();
 					}
@@ -110,53 +117,24 @@ public class Word {
 		return this.possibleTypes.size();
 	}
 
-	public void removeFirstWT() {
+	public void removeFirstWordType() {
 		if(!this.possibleTypes.isEmpty()){
 			remove(this.possibleTypes.iterator().next());
 		}
 	}
 
-	public void remove(WT wt) {
+	public void remove(WordType wt) {
 		this.possibleTypes.remove(wt);
-		setWt(this.possibleTypes);
+		setWordType(this.possibleTypes);
 	}
 
-	public WordType getWt() {
+	public WordType getWordType() {
 		return wt;
 	}
 
-	public void setWt(Set<WT> pt) {
+	public void setWordType(Set<WordType> pt) {
 		if(!pt.isEmpty()){
-			WT wt = (WT) pt.iterator().next();
-			switch (wt) {
-			case NOUN:
-				this.wt = new Noun();			
-				break;
-			case VERB:
-				this.wt = new Verb();			
-				break;
-			case ADJ:
-				this.wt = new Adj();			
-				break;
-			case ADV:
-				this.wt = new Adv();			
-				break;
-			case CONJ:
-				this.wt = new Conj();			
-				break;
-			case DET:
-				this.wt = new Det();			
-				break;
-			case PREP:
-				this.wt = new Prep();			
-				break;
-			case PRON:
-				this.wt = new Pron();			
-				break;
-			default:
-				this.wt = null;			
-				break;
-			}
+			wt = pt.iterator().next();
 		}
 	}
 
@@ -170,12 +148,12 @@ public class Word {
 
 	public String printPossibleTypes(){
 		String s = "";
-		for (Iterator<WT> iterator = this.possibleTypes.iterator(); iterator.hasNext();) {
-			WT type = (WT) iterator.next();
+		for (Iterator<WordType> iterator = this.possibleTypes.iterator(); iterator.hasNext();) {
+			WordType type = (WordType) iterator.next();
 			if(s.length()>0){
 				s += "/";
 			}
-			s += type.name();
+			s += type.getClass().getSimpleName();
 			
 		}
 		return s;
@@ -188,6 +166,7 @@ public class Word {
 			System.out.println(w.wt.getClass().getName());
 		}
 	}
+
 
 
 

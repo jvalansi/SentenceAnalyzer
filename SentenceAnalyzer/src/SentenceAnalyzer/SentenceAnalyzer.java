@@ -50,7 +50,8 @@ public class SentenceAnalyzer {
 
 	private static Sentence answer(Sentence question, String info){
 //		reverse sentence: what is that -> that is what
-		Sentence answer = question.reverse();
+		Sentence answer = question.reverseSentence();
+		System.out.println(answer);
 //		replace interrogative word
 		answer = answer.replaceWH(info);
 		return answer;
@@ -78,9 +79,10 @@ public class SentenceAnalyzer {
 ////		System.out.println(s);
 //		System.out.println(findGoodSentence(s, 1));
 
-		String info = "Dani is sad";
-		String q = "what is Dani";
+		String info = "Dani sees trains.";
+		String q = "What does Dani see?";
 		s = new Sentence(q);
+		System.out.println(s);
 		System.out.println(answer(s, info));
 		
 		

@@ -4,59 +4,63 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Scanner;
 
+import WordType.Verb;
 import WordType.WordType;
 
 
 public class Sentence {
-	private String sentenceString;
-	private List<Word> words = new ArrayList<Word>();
+//	private List<Word> words = new ArrayList<Word>();
+	private SentenceType type;
 	private List<Word> subject = new ArrayList<Word>();
 	private List<Word> object = new ArrayList<Word>();
 	private Word verb;
 	
 	public Sentence(String string) {
-		this.sentenceString = string;
-		this.separatePunctuation(this.sentenceString);
-		this.fixConjunctions(this.sentenceString);
-		this.separateWords(this.sentenceString);
+		type = getSentenceType(string);
+		String s = removePunctuation(string);
+		s = separatePunctuation(s);
+		s = fixConjunctions(s);
+		List<Word> words = separateWords(s);
 //		this.fixAmbiguity((ArrayList<Word>) this.words);
-		seperateSubjectObject();
+		seperateSubjectObject(words);
 	}
 
-	private void seperateSubjectObject() {
-		int verbIndex = getVerbIndex();
-		for (int i = 0; i < verbIndex; i++) {
-			this.subject.add(words.get(i));
-		}
-		this.verb = this.words.get(verbIndex);
-		for (int i = verbIndex+1; i < words.size(); i++) {
-			this.object.add(words.get(i));
-		}
+	private String removePunctuation(String s) {
+		s = s.replaceAll("\\.", "");
+		s = s.replaceAll("!", "");
+		s = s.replaceAll("\\?", "");
+		return s;
 	}
 
-	private int getVerbIndex() {
-		for (int i = 0; i < words.size(); i++) {
-			if(words.get(i).getWt().getClass().getName().contains("Verb")){
-				return i;
-			}
+	private SentenceType getSentenceType(String string) {
+		if(string.endsWith("?")){
+			return SentenceType.INTERROGATIVE;
+		} else if(string.endsWith("!")){
+			return SentenceType.EXCLAMATORY;
+		} else {
+			return SentenceType.DECLARATIVE;
 		}
-		return 0;
 	}
 
 	public Sentence(Sentence sentence) {
-		this.sentenceString = sentence.sentenceString;
-		for (Iterator<Word> iterator = sentence.words.iterator(); iterator.hasNext();) {
+		for (Iterator<Word> iterator = sentence.subject.iterator(); iterator.hasNext();) {
 			Word w = iterator.next();
-			this.words.add(new Word(w));
+			this.subject.add(new Word(w));
+		}
+		this.verb = sentence.verb;
+		for (Iterator<Word> iterator = sentence.object.iterator(); iterator.hasNext();) {
+			Word w = iterator.next();
+			this.object.add(new Word(w));
 		}
 	}
 
-	private void separatePunctuation(String s) {
-		this.sentenceString = s.replaceAll(",", " ,");
+	private String separatePunctuation(String s) {
+		s = s.replaceAll(",", " ,");
+		return s;
 	}
 
 
-	private void fixConjunctions(String s) {
+	private String fixConjunctions(String s) {
 		Scanner sc = new Scanner(s);
 		String ns = new String();
 		while (sc.hasNext()) {
@@ -83,18 +87,55 @@ public class Sentence {
 			}
 		}		
 		sc.close();
-		this.sentenceString = ns;
+		return ns;
 	}
 
-	private void separateWords(String string) {
+	private  List<Word> separateWords(String string) {
+		List<Word> words = new ArrayList<Word>();
 		Scanner s = new Scanner(string);
 		while (s.hasNext()) {
 			String w = s.next();
-			this.words.add(new Word(w));
+			words.add(new Word(w));
 		}
 		s.close();
+		return words;
 	}
 
+	private List<Word> joinSubjectObject() {
+		List<Word> words = new ArrayList<Word>();
+		words.addAll(subject);
+		words.add(verb);
+		words.addAll(object);
+		return words;
+	}
+
+	private void seperateSubjectObject(List<Word> words) {
+		int verbIndex = getVerbIndex(words);
+		for (int i = 0; i < verbIndex; i++) {
+			this.subject.add(words.get(i));
+		}
+		if(verbIndex>=0){
+			this.verb = words.get(verbIndex);
+		}
+		for (int i = verbIndex+1; i < words.size(); i++) {
+			this.object.add(words.get(i));
+		}
+	}
+
+	private int getVerbIndex(List<Word> words) {
+		for (int i = 0; i < words.size(); i++) {
+			WordType wordType = words.get(i).getWordType();
+			if(wordType==null){
+				continue;
+			}
+			if(wordType.getClass().getName().contains("Verb")){
+				return i;
+			}
+		}
+		return -1;
+	}
+	
+/*
 //	private void fixAmbiguity(ArrayList<Word> words) {
 //		Word prevWord = null;
 //		for (int i = 0; i < words.size(); i++) {
@@ -127,37 +168,27 @@ public class Sentence {
 //			}
 //		}
 //	}
-
-	public Sentence reverse() {
-		List<Word> reversedWords = new ArrayList<Word>();
-		for (int i = 0; i < object.size(); i++) {
-			reversedWords.add(object.get(i));
+*/
+	
+	public Sentence reverseSentence() {
+		Sentence reverseSentence = new Sentence(this);
+		if(((Verb)reverseSentence.verb.getWordType()).getBaseForm().matches("do")){
+			reverseSentence.verb = null;
 		}
-		reversedWords.add(verb);
-		for (int i = 0; i < subject.size(); i++) {
-			reversedWords.add(subject.get(i));
-		}
-		String reverseString = joinWords(reversedWords);
-		Sentence reverseSentence = new Sentence(reverseString);
+		List<Word> temp = reverseSentence.object;
+		reverseSentence.object = reverseSentence.subject;
+		reverseSentence.subject = temp;
 		return reverseSentence;
 	}
 	
-	private String joinWords(List<Word> words) {
-		String s = "";
-		for (int i = 0; i < words.size(); i++) {
-			s+= words.get(i).getWs()+" ";
-		}
-		return s;
-	}
-
 	public Sentence replaceWH(String info) {
-		for (int i = 0; i < words.size(); i++) {
-			if(isWH(words.get(i))){
-				words.remove(i);
-			}
+		List<Word> words = joinSubjectObject();
+		String s = this.printWords(words,1);
+		String [] wh = {"What","Where","When","Why","How","Who","Which"};
+		for (int i = 0; i < wh.length; i++) {
+			s = s.replace(wh[i], "").trim();			
 		}
-		String s = joinWords(words);
-		String[] ss = seperateSentences(info);
+		String[] ss = info.split("([\\.!?])\\s+");
 		for (int i = 0; i < ss.length; i++) {
 			if(ss[i].contains(s)){
 				Sentence sn = new Sentence(ss[i]);
@@ -167,48 +198,50 @@ public class Sentence {
 		return null;
 	}
 
-	private String[] seperateSentences(String s) {
-		return s.split("([\\.!?])\\s+");
-	}
-
-	private boolean isWH(Word word) {
-		String ws = word.getWs();
-		String [] wh = {"what","where","when","why","how","who","which"};
-		for (int i = 0; i < wh.length; i++) {
-			if(ws.equals(wh[i])){
-				return true; 
-			}
-		}
-		return false;
-	}
-
 //	Print functions
 	
-	public String printWords(List<Word> wl) {
+	public String printWords(List<Word> wl, int width) {
 		String s = "";
 		for (int i = 0; i < wl.size(); i++) {
-			s  += String.format("%-25s", wl.get(i).getWs());
+			Word word = wl.get(i);
+			String wordString = "";
+			if(word!=null){
+				wordString = word.getWs();
+			}
+			s += String.format("%"+width+"s", wordString);
+			s += " ";
 		}
 		return s;
 	}
 	
-	public String printWordTypes(List<Word> wl) {
+	public String printWordTypes(List<Word> wl, int width) {
 		String s = "";
 		for (int i = 0; i < wl.size(); i++) {
-			WordType wt = wl.get(i).getWt();
-			if(wt != null){
-				s  += String.format("%-25s", wt.getClass().getName());
-			} else {
-				s += String.format("%-25s", "Null");
+			Word word = wl.get(i);
+			String wordTypeString = "Null";
+			if(word!=null){
+				WordType wt = word.getWordType();
+				if(wt != null){
+					wordTypeString = wt.getClass().getSimpleName();
+				}
 			}
+			s += String.format("%"+width+"s", wordTypeString);
+			s += " ";
 		}
 		return s;
 	}
 
-	public String printWordPossibleTypes(List<Word> wl) {
+	public String printWordPossibleTypes(List<Word> wl,int width) {
 		String s = "";
 		for (int i = 0; i < wl.size(); i++) {
-			s  += String.format("%-25s", wl.get(i).printPossibleTypes());
+			Word word = wl.get(i);
+			String wordTypesString = "Null";
+			if(word!=null){
+				wordTypesString = word.printPossibleTypes();
+			}
+			s += String.format("%"+width+"s", wordTypesString);
+			s += " ";
+
 		}
 		return s;
 	}
@@ -216,9 +249,11 @@ public class Sentence {
 	@Override
 	public String toString() {
 		String s = "";
-		s+=printWords(this.words)+"\n";
-		s+=printWordTypes(this.words)+"\n";
-		s+=printWordPossibleTypes(this.words)+"\n";
+		List<Word> words = joinSubjectObject();
+		int width = -25;
+		s+=printWords(words,width)+"\n";
+		s+=printWordTypes(words,width)+"\n";
+		s+=printWordPossibleTypes(words,width)+"\n";
 		return s;
 	}
 
@@ -227,10 +262,12 @@ public class Sentence {
 	 */
 	public ArrayList<Sentence> getNextPossibleSenses() {
 		ArrayList<Sentence> sl = new ArrayList<Sentence>();
-		for (int i = 0; i < this.words.size(); i++) {
-			if(this.words.get(i).possibleTypesSize() > 1){
+		List<Word> words = joinSubjectObject();
+		for (int i = 0; i < words.size(); i++) {
+			if(words.get(i).possibleTypesSize() > 1){
 				Sentence s = new Sentence(this);
-				s.words.get(i).removeFirstWT();
+				List<Word> sWords = s.joinSubjectObject();
+				sWords.get(i).removeFirstWordType();
 				sl.add(s);
 			}
 		}
